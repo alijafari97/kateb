@@ -1,0 +1,58 @@
+{
+  "name": "kateb",
+  "productName": "کاتب",
+  "version": "0.1.0",
+  "description": "مجلس‌نویسِ خودکار — صوت را با NotebookLM رونویسی و با Gemini تمیز می‌کند و سندِ فارسی می‌سازد (مرورگری، بدونِ API).",
+  "main": "src/main/main.js",
+  "author": "موسسه",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "postinstall": "node scripts/postinstall.js",
+    "gen:icon": "node scripts/gen-icon.js",
+    "test": "node test/smoke.js",
+    "test:e2e": "node test/integration.js",
+    "test:orch": "node test/orchestrator.js",
+    "test:display": "node test/display-mode.js",
+    "test:nav": "node test/renderer-nav.js",
+    "test:resilience": "node test/resilience.js",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "docx": "^9.0.2",
+    "ffmpeg-static": "^5.2.0",
+    "playwright-core": "^1.47.2"
+  },
+  "devDependencies": {
+    "electron": "^32.1.2",
+    "electron-builder": "^25.0.5"
+  },
+  "build": {
+    "appId": "net.moasese.kateb",
+    "productName": "Kateb",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/playwright-core/**",
+      "**/*.node"
+    ],
+    "files": ["src/**/*", "assets/**/*", "package.json"],
+    "extraMetadata": { "main": "src/main/main.js" },
+    "mac": { "target": ["dmg"], "category": "public.app-category.productivity", "icon": "assets/icon.png" },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "assets/icon.png" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kateb",
+      "artifactName": "Kateb-Setup-${version}.${ext}"
+    },
+    "linux": { "target": ["AppImage"], "category": "Utility", "icon": "assets/icon.png" }
+  }
+}

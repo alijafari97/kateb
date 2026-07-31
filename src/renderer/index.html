@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>کاتب</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark">کاتب</span><span class="lat">KĀTEB</span></div>
+    <nav class="nav">
+      <button class="navbtn" data-go="main">صوت‌ها</button>
+      <button class="navbtn" data-go="settings">تنظیمات</button>
+    </nav>
+  </header>
+
+  <main id="app">
+
+    <!-- 1) LOGIN -->
+    <section class="view active" data-view="login">
+      <div class="hero">
+        <h1>به کاتب خوش آمدید</h1>
+        <p class="lede">برای رونویسی و تمیزکاری، یک‌بار با حسابِ گوگلِ خودتان وارد شوید. همین یک حساب برای NotebookLM و Gemini کافی است — هیچ کلید یا تنظیماتِ فنی‌ای لازم نیست.</p>
+        <button id="loginBtn" class="btn primary big">ورود با گوگل و آماده‌سازی</button>
+        <p id="loginStatus" class="status"></p>
+        <div id="loginChallenge" class="banner hidden">
+          <span class="bi">!</span>
+          <span>گوگل تأییدِ هویت خواست. پنجرهٔ مرورگری که باز شد را کامل کنید؛ به‌محضِ ورود، خودکار ادامه می‌دهیم.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2) MAIN / ADD -->
+    <section class="view" data-view="main">
+      <div class="wrap">
+        <div id="drop" class="drop">
+          <div class="plus">＋</div>
+          <div class="dropt">صوت‌ها را این‌جا بکشید</div>
+          <div class="drops">یا برای انتخاب کلیک کنید — mp3، m4a، wav…</div>
+        </div>
+        <div id="fileList" class="filelist"></div>
+        <div class="actions">
+          <label class="check" style="font-size:.84rem"><input type="checkbox" id="mainShowBrowser" /> مرورگر را ببینم <span class="muted">(به‌جای اجرا در پس‌زمینه)</span></label>
+          <div style="display:flex; align-items:center; gap:1rem">
+            <span id="fileCount" class="muted"></span>
+            <button id="startBtn" class="btn primary" disabled>شروعِ رونویسی ←</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3) PROGRESS -->
+    <section class="view" data-view="progress">
+      <div class="wrap">
+        <div id="progChallenge" class="banner hidden">
+          <span class="bi">!</span>
+          <span>گوگل تأییدِ هویت خواست — پنجرهٔ مرورگر را کامل کنید و ادامه دهید.</span>
+        </div>
+        <div id="progList" class="proglist"></div>
+        <div class="actions">
+          <button id="backBtn" class="btn ghost">افزودنِ صوتِ دیگر</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4) SETTINGS -->
+    <section class="view" data-view="settings">
+      <div class="wrap narrow">
+        <h2 class="vh">تنظیمات</h2>
+        <label class="field-lab">پرامپتِ تمیزکاری</label>
+        <textarea id="setPrompt" class="ta" rows="8"></textarea>
+        <p class="hint">دیفالت همان پرامپتِ حفظِ لحن است. فقط اگر لازم داری تغییرش بده.</p>
+
+        <div class="row2">
+          <label class="check"><input type="checkbox" id="setDocx" /> خروجیِ Word (.docx)</label>
+          <label class="check"><input type="checkbox" id="setMd" /> خروجیِ Markdown (.md)</label>
+        </div>
+
+        <label class="check" style="margin-top:.9rem"><input type="checkbox" id="setShowBrowser" /> نمایشِ مرورگر — معمولاً خاموش تا در پس‌زمینه کار کند و سیستمت آزاد بماند؛ فقط برای ورودِ اولیه روشنش کن</label>
+
+        <div class="row2">
+          <div>
+            <label class="field-lab">پردازشِ همزمانِ چند فایل</label>
+            <input id="setConcurrency" class="input mono" type="number" min="1" max="4" />
+          </div>
+          <div>
+            <label class="field-lab">فشرده‌سازیِ صوتِ بزرگ‌تر از (مگابایت)</label>
+            <input id="setMaxMB" class="input mono" type="number" min="10" />
+          </div>
+        </div>
+
+        <label class="field-lab">پوشهٔ خروجی</label>
+        <div class="folderrow">
+          <input id="setDir" class="input mono" readonly />
+          <button id="pickDir" class="btn ghost sm">انتخاب…</button>
+        </div>
+
+        <label class="field-lab">سربرگِ موسسه روی سند (اختیاری)</label>
+        <input id="setHeader" class="input" placeholder="مثلاً: موسسهٔ …" />
+
+        <div class="row2">
+          <div>
+            <label class="field-lab">شکستنِ صوتِ بلندتر از (دقیقه)</label>
+            <input id="setSplit" class="input mono" type="number" min="30" />
+          </div>
+          <div>
+            <label class="field-lab">اندازهٔ تکه برای Gemini (کلمه)</label>
+            <input id="setChunk" class="input mono" type="number" min="800" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="resetSet" class="btn ghost">بازگردانی به پیش‌فرض</button>
+          <button id="saveSet" class="btn primary">ذخیره</button>
+        </div>
+        <p id="setSaved" class="status"></p>
+      </div>
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
