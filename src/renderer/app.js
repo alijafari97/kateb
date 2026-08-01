@@ -204,6 +204,7 @@ async function loadSettings() {
   $('#setShowBrowser').checked = !!s.showBrowser; curShowBrowser = !!s.showBrowser;
   $('#setConcurrency').value = s.concurrency || 2;
   $('#setMaxMB').value = s.maxAudioMB || 45;
+  $('#setGeminiParallel').checked = !!s.geminiParallel;
 }
 $('#pickDir').addEventListener('click', async () => { const d = await K.pickFolder(); if (d) $('#setDir').value = d; });
 $('#saveSet').addEventListener('click', async () => {
@@ -215,7 +216,8 @@ $('#saveSet').addEventListener('click', async () => {
     chunkWords: +$('#setChunk').value || 2200,
     showBrowser: $('#setShowBrowser').checked,
     concurrency: +$('#setConcurrency').value || 2,
-    maxAudioMB: +$('#setMaxMB').value || 45
+    maxAudioMB: +$('#setMaxMB').value || 45,
+    geminiParallel: $('#setGeminiParallel').checked
   });
   // if the display mode changed here, drop the idle browser so the next run honors it
   if ($('#setShowBrowser').checked !== curShowBrowser) { curShowBrowser = $('#setShowBrowser').checked; try { await K.resetBrowser(); } catch (_) {} }
@@ -226,4 +228,5 @@ $('#resetSet').addEventListener('click', async () => {
   $('#setPrompt').value = d.cleaningPrompt; $('#setDocx').checked = d.output.docx; $('#setMd').checked = d.output.md;
   $('#setDir').value = d.output.dir; $('#setSplit').value = d.splitAboveMinutes; $('#setChunk').value = d.chunkWords;
   $('#setShowBrowser').checked = d.showBrowser; $('#setConcurrency').value = d.concurrency; $('#setMaxMB').value = d.maxAudioMB;
+  $('#setGeminiParallel').checked = d.geminiParallel;
 });

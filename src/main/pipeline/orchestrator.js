@@ -203,13 +203,24 @@ class Orchestrator {
       this.stage(fileId, 'clean', 'now');
       this.log(fileId, 'از متنِ تمیزِ قبلی استفاده شد — دوباره پاک نشد');
     } else {
-      this.stage(fileId, 'clean', 'now', 'در نوبتِ Gemini…');
       const chunks = chunkTranscript(transcript, this.config.chunkWords);
-      ({ text, warnings } = await this.withGemini((gp) => cleanAllChunks(gp, this.config.cleaningPrompt, chunks, {
+      const doClean = (gp) => cleanAllChunks(gp, this.config.cleaningPrompt, chunks, {
         minRatio: this.config.minLengthRatio,
         onLog: (m) => this.log(fileId, m),
         onProgress: (p) => this.stage(fileId, 'clean', 'now', `تکه ${p.index}/${p.total}`)
-      })));
+      });
+      if (this.config.geminiParallel) {
+        // each file cleans in its OWN Gemini tab — no queue. Safe now that injection is
+        // clipboard-free (synthetic paste), so tabs don't fight over the OS clipboard.
+        this.stage(fileId, 'clean', 'now', 'Gemini…');
+        const gp = await ensureGemini(this.browser);
+        try { ({ text, warnings } = await doClean(gp)); }
+        finally { await gp.close().catch(() => {}); }
+      } else {
+        // serial: one shared Gemini tab, files take turns (safer for Gemini's daily limit)
+        this.stage(fileId, 'clean', 'now', 'در نوبتِ Gemini…');
+        ({ text, warnings } = await this.withGemini(doClean));
+      }
       fs.writeFileSync(cCache, JSON.stringify({ promptHash, text, warnings }));
     }
     this.stage(fileId, 'clean', warnings.length ? 'warn' : 'done', warnings.length ? `${warnings.length} بخش نیاز به بازبینی` : 'کامل ✓');

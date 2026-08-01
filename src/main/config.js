@@ -30,7 +30,10 @@ function defaults() {
     // working; turn on once for the first Google login, then turn it back off.
     showBrowser: false,
     // How many files to process at the same time.
-    concurrency: 2
+    concurrency: 2,
+    // Clean files in Gemini in PARALLEL too (one Gemini tab per file). Off by default:
+    // serial is safer against Gemini's per-account daily limit. On = faster for many files.
+    geminiParallel: false
   };
 }
 

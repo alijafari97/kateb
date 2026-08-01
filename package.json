@@ -1,7 +1,7 @@
 {
   "name": "kateb",
   "productName": "کاتب",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "مجلس‌نویسِ خودکار — صوت را با NotebookLM رونویسی و با Gemini تمیز می‌کند و سندِ فارسی می‌سازد (مرورگری، بدونِ API).",
   "main": "src/main/main.js",
   "author": "موسسه",
@@ -17,6 +17,7 @@
     "test:display": "node test/display-mode.js",
     "test:nav": "node test/renderer-nav.js",
     "test:resilience": "node test/resilience.js",
+    "test:gparallel": "node test/gemini-parallel.js",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
@@ -40,10 +41,32 @@
       "node_modules/playwright-core/**",
       "**/*.node"
     ],
-    "files": ["src/**/*", "assets/**/*", "package.json"],
-    "extraMetadata": { "main": "src/main/main.js" },
-    "mac": { "target": ["dmg"], "category": "public.app-category.productivity", "icon": "assets/icon.png" },
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "assets/icon.png" },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "src/main/main.js"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
@@ -53,6 +76,12 @@
       "shortcutName": "Kateb",
       "artifactName": "Kateb-Setup-${version}.${ext}"
     },
-    "linux": { "target": ["AppImage"], "category": "Utility", "icon": "assets/icon.png" }
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility",
+      "icon": "assets/icon.png"
+    }
   }
 }
