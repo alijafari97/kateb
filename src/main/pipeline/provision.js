@@ -6,9 +6,17 @@ const fs = require('fs');
 const path = require('path');
 
 function cliPath() {
+  // playwright-core's "exports" map does NOT expose ./cli.js, so require.resolve(
+  // 'playwright-core/cli.js') throws ERR_PACKAGE_PATH_NOT_EXPORTED (this is the Windows
+  // first-run crash). Resolve the package DIR via its package.json — which IS exported —
+  // and join cli.js. (On Linux this path was never hit: Chromium was already present.)
   let p;
-  try { p = require.resolve('playwright-core/cli.js'); }
-  catch (_) { p = require.resolve('playwright/cli.js'); }
+  try {
+    p = path.join(path.dirname(require.resolve('playwright-core/package.json')), 'cli.js');
+  } catch (_) {
+    // last resort: relative to the bundled node_modules
+    p = path.join(__dirname, '..', '..', '..', 'node_modules', 'playwright-core', 'cli.js');
+  }
   // when packaged, the runnable copy lives in app.asar.unpacked (see build.asarUnpack)
   return p.replace(/app\.asar(?!\.unpacked)/, 'app.asar.unpacked');
 }
@@ -36,4 +44,4 @@ async function ensureChromium(userDataDir, { onProgress = () => {} } = {}) {
   return true;
 }
 
-module.exports = { ensureChromium };
+module.exports = { ensureChromium, cliPath };
