@@ -59,7 +59,10 @@ function getOrchestrator() {
 
 app.whenReady().then(() => {
   const userData = app.getPath('userData');
-  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(userData, 'ms-playwright');
+  // Prefer a Chromium BUNDLED with the installer (resources/ms-playwright) — no first-run
+  // download. Fall back to the user's data dir (where provision.js downloads it) otherwise.
+  const bundled = process.resourcesPath ? path.join(process.resourcesPath, 'ms-playwright') : null;
+  process.env.PLAYWRIGHT_BROWSERS_PATH = (bundled && fs.existsSync(bundled)) ? bundled : path.join(userData, 'ms-playwright');
   config.init(userData);
   initLog(userData);
   createWindow();

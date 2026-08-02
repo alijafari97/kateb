@@ -3,3 +3,4 @@ dist/
 *.log
 .DS_Store
 # runtime data (browser profile / downloaded chromium live in the OS user-data dir)
+pw-browsers/

@@ -21,26 +21,51 @@ function cliPath() {
   return p.replace(/app\.asar(?!\.unpacked)/, 'app.asar.unpacked');
 }
 
-// Ensure a usable Chromium exists; download it if this is the first run.
+// Ensure a usable Chromium exists. Prefer one BUNDLED with the installer (no network);
+// fall back to downloading into the user's data dir on first run.
 async function ensureChromium(userDataDir, { onProgress = () => {} } = {}) {
-  const dir = path.join(userDataDir, 'ms-playwright');
-  process.env.PLAYWRIGHT_BROWSERS_PATH = dir;
-  fs.mkdirSync(dir, { recursive: true });
-
   const { chromium } = require('playwright-core');
-  const present = () => { try { const e = chromium.executablePath(); return e && fs.existsSync(e); } catch (_) { return false; } };
+  const presentAt = (p) => { process.env.PLAYWRIGHT_BROWSERS_PATH = p; try { const e = chromium.executablePath(); return e && fs.existsSync(e); } catch (_) { return false; } };
+
+  // 1) a browser shipped inside the app (resources/ms-playwright) — the reliable path,
+  //    especially on restricted networks where the Playwright CDN is slow/blocked.
+  const bundled = process.resourcesPath && path.join(process.resourcesPath, 'ms-playwright');
+  if (bundled && fs.existsSync(bundled) && presentAt(bundled)) return true;
+
+  // 2) otherwise use / download into the user's data dir
+  const dir = path.join(userDataDir, 'ms-playwright');
+  fs.mkdirSync(dir, { recursive: true });
+  const present = () => presentAt(dir);
   if (present()) return true;
 
   onProgress({ phase: 'download', msg: 'دریافتِ مرورگر (فقط بارِ اول، کمی طول می‌کشد)…' });
-  await new Promise((resolve, reject) => {
+  const logFile = path.join(userDataDir, 'logs', 'chromium-install.log');
+  try { fs.mkdirSync(path.dirname(logFile), { recursive: true }); } catch (_) {}
+
+  const attempt = (n) => new Promise((resolve, reject) => {
     const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1', PLAYWRIGHT_BROWSERS_PATH: dir };
     const ps = spawn(process.execPath, [cliPath(), 'install', 'chromium'], { env });
-    let last = '';
-    ps.stdout.on('data', (d) => { last = d.toString().trim().split('\n').pop(); onProgress({ phase: 'download', msg: last }); });
-    ps.stderr.on('data', (d) => { last = d.toString().trim().split('\n').pop(); });
-    ps.on('close', (c) => (c === 0 || present()) ? resolve() : reject(new Error('دریافتِ مرورگر ناموفق بود (' + c + ') ' + last)));
-    ps.on('error', reject);
+    let out = '';
+    const cap = (d) => { const s = d.toString(); out += s; const line = s.trim().split('\n').filter(Boolean).pop(); if (line) onProgress({ phase: 'download', msg: line }); };
+    ps.stdout.on('data', cap);
+    ps.stderr.on('data', cap);
+    ps.on('close', (c) => {
+      try { fs.appendFileSync(logFile, `\n==== attempt ${n} (exit ${c}) ====\ncli: ${cliPath()}\ndest: ${dir}\n${out}\n`); } catch (_) {}
+      if (c === 0 || present()) return resolve();
+      const tail = out.trim().split('\n').filter(Boolean).slice(-4).join(' | ') || 'خروجی‌ای تولید نشد';
+      reject(new Error(`دریافتِ مرورگر ناموفق شد (کد ${c}). علت: ${tail}\nگزارشِ کامل: ${logFile}`));
+    });
+    ps.on('error', (e) => reject(new Error('اجرای دریافت‌کننده ناموفق بود: ' + e.message)));
   });
+
+  // one retry — most first-run failures are a transient network/CDN hiccup
+  try {
+    await attempt(1);
+  } catch (e1) {
+    onProgress({ phase: 'download', msg: 'دریافت ناموفق بود؛ تلاشِ دوباره…' });
+    try { await attempt(2); }
+    catch (e2) { throw new Error(String(e2.message || e2) + '\n(اگر دوباره شد: اینترنت/فیلترشکن را بررسی کن — مرورگر از سرورِ Playwright دانلود می‌شود.)'); }
+  }
   return true;
 }
 

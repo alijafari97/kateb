@@ -29,7 +29,15 @@ jobs:
       - name: Install deps
         run: npm install
         env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'   # the app downloads Chromium on first run
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'   # bundled explicitly in the next step
+
+      # Download THIS platform's Chromium (+ headless shell + ffmpeg) into pw-browsers so
+      # extraResources bundles it into the installer — no fragile first-run download for
+      # end users on restricted networks.
+      - name: Bundle Chromium
+        run: node node_modules/playwright-core/cli.js install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/pw-browsers
 
       - name: Build
         run: npx electron-builder --publish never
