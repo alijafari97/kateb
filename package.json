@@ -1,7 +1,7 @@
 {
   "name": "kateb",
   "productName": "کاتب",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "مجلس‌نویسِ خودکار — صوت را با NotebookLM رونویسی و با Gemini تمیز می‌کند و سندِ فارسی می‌سازد (مرورگری، بدونِ API).",
   "main": "src/main/main.js",
   "author": "موسسه",

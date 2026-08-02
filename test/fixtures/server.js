@@ -11,7 +11,7 @@ const hex = () => Array.from({ length: 32 }, () => '0123456789abcdef'[Math.floor
 const SUMMARY = 'این خلاصهٔ خودکارِ NotebookLM است و باید کاملاً حذف شود. ';
 const BODY = 'سلام علیکم، این یک رونویسیِ آزمایشی است که باید عیناً استخراج شود. مارکرِ استخراج: TRANSCRIPT_MARKER_XYZ. ' +
   'حالا مقداری متنِ محاوره‌ای که می‌گه و می‌خوام و نمی‌دونم توش هست تا طول کافی بشه. '.repeat(60);
-const TRANSCRIPT_PANEL = 'mosh_test.mp3 button_magic Source guide arrow_drop_up' + SUMMARY + BODY;
+const TRANSCRIPT_PANEL = 'voice_note.ogg button_magic Source guide arrow_drop_up' + SUMMARY + BODY;
 
 const page = (title, body) => `<!doctype html><html lang="fa"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>`;
 
@@ -23,7 +23,7 @@ const nlmNotebook = (id) => page('NotebookLM', `
     <button class="mdc-button" onclick="document.getElementById('fi').click()">add Add sources / Upload files</button>
     <input id="fi" type="file" style="display:none" onchange="document.getElementById('src').style.display='block'">
     <div id="src" class="single-source-container">
-      <button class="source-stretched-button">mosh_test.mp3</button>
+      <button class="source-stretched-button">voice_note.ogg</button>
     </div>
     <div class="follow-up-chip">یک سؤالِ پیشنهادی</div>
     <div class="source-panel-view-content">${TRANSCRIPT_PANEL.replace(/</g, '&lt;')}</div>

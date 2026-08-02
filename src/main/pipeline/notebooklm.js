@@ -10,17 +10,35 @@
 const S = require('../selectors').notebooklm;
 
 const CREATE_FN = `(reSrc)=>{const rx=new RegExp(reSrc,'i');const b=[...document.querySelectorAll("button,[role=button]")].find(e=>rx.test((e.getAttribute("aria-label")||"")+(e.innerText||"")));if(!b)return "NO";["pointerdown","mousedown","mouseup","click"].forEach(t=>b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window})));return "OK";}`;
-const CLICK_SRC_FN = `(reSrc)=>{const rx=new RegExp(reSrc,'i');const b=[...document.querySelectorAll("button")].find(e=>rx.test((e.getAttribute("aria-label")||"")+(e.textContent||"")));if(!b)return "NO";["pointerdown","mousedown","mouseup","click"].forEach(t=>b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window})));return "OK";}`;
+// Find the uploaded source chip by the file's OWN name (most reliable) OR any audio
+// extension. Voice notes are .ogg/.m4a/.opus — the old ".mp3"-only match missed them and
+// the app got stuck "uploading" forever even though NLM had the source ready.
+const SRC_FIND_FN = `(base, reSrc)=>{
+  const rx=new RegExp(reSrc,'i'); const bl=(base||'').toLowerCase();
+  return [...document.querySelectorAll('button,[role=button]')].find(e=>{
+    const t=((e.getAttribute('aria-label')||'')+' '+(e.textContent||'')).toLowerCase();
+    return (bl.length>=3 && t.includes(bl)) || rx.test(t);
+  });
+}`;
 
 async function evalRe(page, fnSrc, reSrc) {
   return page.evaluate(({ f, r }) => new Function('reSrc', 'return (' + f + ')(reSrc)')(r), { f: fnSrc, r: reSrc }).catch(() => 'NO');
 }
 
-async function hasAudioSource(page) {
-  return page.evaluate((reSrc) => {
-    const rx = new RegExp(reSrc, 'i');
-    return [...document.querySelectorAll('button')].some((b) => rx.test((b.getAttribute('aria-label') || '') + (b.textContent || '')));
-  }, S.sourceRe.source).catch(() => false);
+const baseOf = (fp) => String(fp || '').split(/[\\/]/).pop().replace(/\.[^.]+$/, '').slice(0, 28);
+
+async function hasAudioSource(page, fname) {
+  return page.evaluate(({ f, base, re }) => !!new Function('base', 'reSrc', 'return (' + f + ')(base,reSrc)')(base, re),
+    { f: SRC_FIND_FN, base: baseOf(fname), re: S.sourceRe.source }).catch(() => false);
+}
+
+async function clickSource(page, fname) {
+  return page.evaluate(({ f, base, re }) => {
+    const el = new Function('base', 'reSrc', 'return (' + f + ')(base,reSrc)')(base, re);
+    if (!el) return 'NO';
+    ['pointerdown', 'mousedown', 'mouseup', 'click'].forEach((t) => el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })));
+    return 'OK';
+  }, { f: SRC_FIND_FN, base: baseOf(fname), re: S.sourceRe.source }).catch(() => 'NO');
 }
 
 async function transcriptLength(page) {
@@ -95,7 +113,7 @@ async function transcribeFile(browser, filePath, { maxWaitMs = 30 * 60 * 1000, o
     let sawSource = false, ticks = 0;
     while (Date.now() - start < maxWaitMs) {
       if (!sawSource) {
-        sawSource = await hasAudioSource(p);
+        sawSource = await hasAudioSource(p, filePath);
         if (!sawSource) {
           await p.waitForTimeout(5000);
           if (++ticks % 12 === 0) onLog('در حالِ آپلودِ صوت به NotebookLM…');
@@ -107,7 +125,7 @@ async function transcribeFile(browser, filePath, { maxWaitMs = 30 * 60 * 1000, o
       // open the source and poll its transcript (all in place — no navigation)
       let clicked = 'NO';
       for (let i = 0; i < 3 && clicked !== 'OK'; i++) {
-        clicked = await evalRe(p, CLICK_SRC_FN, S.sourceRe.source);
+        clicked = await clickSource(p, filePath);
         if (clicked !== 'OK') await p.waitForTimeout(2500);
       }
       let len = 0;

@@ -16,8 +16,9 @@ module.exports = {
     // only appears after that click.
     uploadButton: 'button:has-text("Upload files")',
     addSourceButton: 'button:has-text("Add source")',
-    // A source chip shows the file name; audio sources contain ".mp3".
-    sourceRe: /\.mp3/i,
+    // A source chip shows the file name. Match ANY audio extension — voice notes are
+    // .ogg/.m4a/.opus, NOT .mp3 (matching only .mp3 left non-mp3 uploads "uploading" forever).
+    sourceRe: /\.(mp3|m4a|wav|aac|ogg|oga|opus|mp4|flac|mpeg|mpga|weba|webm|3gp|amr|aiff?)/i,
     // Transcript lives here once the source is opened.
     transcriptSel: '.source-panel-view-content',
     // "Source guide" is NLM's auto-summary; strip everything up to and including it.
