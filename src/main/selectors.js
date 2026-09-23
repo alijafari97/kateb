@@ -8,8 +8,9 @@ module.exports = {
     notebookUrl: (id) => `https://notebooklm.google.com/notebook/${id}`,
     // NLM's Sources panel COLLAPSES below ~1200px and the .mp3 source button vanishes.
     minViewport: { width: 1500, height: 1000 },
-    // "Create new notebook" button — matched on aria-label OR text.
-    createRe: /Create new notebook|Create notebook/i,
+    // The create-notebook button — Google renamed it "Create new notebook" -> "New notebook"
+    // (Sep 2026). Match both, plus Persian, so a future rename doesn't wedge the login check.
+    createRe: /New notebook|Create new notebook|Create notebook|نوت‌?بوکِ? ?(جدید|نو)|ساختِ? ?نوت‌?بوک/i,
     // After create, NLM opens the "Add sources" dialog (?addSource=true). The
     // "Upload files" button must be clicked with a TRUSTED click to open the OS file
     // chooser (a synthetic dispatchEvent click won't). The hidden <input type=file>

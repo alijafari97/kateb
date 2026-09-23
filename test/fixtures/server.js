@@ -16,7 +16,7 @@ const TRANSCRIPT_PANEL = 'voice_note.ogg button_magic Source guide arrow_drop_up
 const page = (title, body) => `<!doctype html><html lang="fa"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>`;
 
 const nlmHome = page('NotebookLM', `
-  <div class="mat-app"><button aria-label="Create new notebook" onclick="location.href='/newnotebook'">add Create new notebook</button></div>`);
+  <div class="mat-app"><button aria-label="New notebook" onclick="location.href='/newnotebook'">add New notebook</button></div>`);
 
 const nlmNotebook = (id) => page('NotebookLM', `
   <section class="source-panel">
