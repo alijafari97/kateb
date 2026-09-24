@@ -132,7 +132,7 @@ async function sendAndGet(page, message, { fresh = false } = {}) {
 
   // wait until a new reply appears, the stop control is gone, and length is stable.
   // Early-bail if nothing starts within ~40s (a failed send shouldn't cost 6.5 minutes).
-  let last = 0, stable = 0, started = false, sawStop = false;
+  let last = 0, stable = 0, started = false, sawStop = false, wrote = false;
   for (let i = 0; i < 120; i++) {
     const st = await page.evaluate(({ resp, stopRe }) => {
       const rx = new RegExp(stopRe, 'i');
@@ -143,12 +143,18 @@ async function sendAndGet(page, message, { fresh = false } = {}) {
     // A visible "Stop response" means Gemini IS working — Pro "thinks" for a while before any
     // text appears, and bailing then (the old 40s rule) returned an empty reply every time.
     if (st.stop > 0) { sawStop = true; started = true; }
-    if (st.n > base && st.len > 15) started = true;
+    if (st.n > base && st.len > 15) { started = true; wrote = true; }
     if (st.n > base && st.stop === 0 && (st.len > 15 || (sawStop && st.len > 0))) {
       if (st.len === last) { stable++; if (stable >= 3) break; } else stable = 0;
       last = st.len;
     }
     if (!started && i >= 13) return '';   // ~40s and no reply began — send didn't take; caller retries
+    // Pro thinks ~25-70s before writing. A spinner with NOT ONE word after ~3 min is a hung
+    // request (seen live: 6 minutes of spinner, then nothing) — stop it; the caller retries fresh.
+    if (started && !wrote && i >= 60) {
+      await page.locator('button[aria-label*="Stop" i]').first().click({ timeout: 3000 }).catch(() => {});
+      return '';
+    }
     await page.waitForTimeout(3000);
   }
 

@@ -71,26 +71,41 @@ function splitInHalf(text) {
   return [w.slice(0, cut).join(' '), w.slice(cut).join(' ')];
 }
 
+// With hasNlmSummary the prompt tells Gemini to DROP the leading NotebookLM summary paragraph,
+// so completeness must be measured against the text WITHOUT it — otherwise the first chunk of
+// every file looks 10-20% "too short" and gets needlessly retried/split (and a raw fallback
+// would print NLM's summary as if it were speech).
+// Only a paragraph that READS like NLM's summary is dropped ("این متن …", "This source …") —
+// if NLM ever stops adding one, real speech must never be cut.
+const NLM_SUMMARY_RE = /^\s*(?:این\s+(?:متن|منبع|منابع|سند|فایل|گفت.?و.?گو|گفتگو|جلسه|صوت|سخنرانی)|(?:this|these|the)\s+(?:source|sources|text|audio|document|recording|conversation))/i;
+function withoutNlmSummary(text, hasNlmSummary) {
+  if (!hasNlmSummary) return text;
+  const i = text.indexOf('\n\n');
+  if (!(i > 0 && i < 2500 && i < text.length * 0.5)) return text;
+  return NLM_SUMMARY_RE.test(text.slice(0, i)) ? text.slice(i + 2).trim() : text;
+}
+
 // Clean ONE chunk with the full safeguard loop. Returns {text, warning}.
 async function cleanChunkVerified(page, basePrompt, chunkText, opts = {}) {
   const { index = 1, total = 1, hasNlmSummary = false, minRatio = 0.85, onLog = () => {}, depth = 0, insist = false } = opts;
   const msg = buildChunkMessage(basePrompt, chunkText, { index, total, hasNlmSummary, insist });
+  const basis = withoutNlmSummary(chunkText, hasNlmSummary);   // what the output must cover
 
   let out = stripPreamble(await sendAndGet(page, msg, { fresh: true }));
-  let chk = checkCompleteness(chunkText, out, minRatio);
+  let chk = checkCompleteness(basis, out, minRatio);
 
   // (a) truncated mid-output -> ask Gemini to continue, then stitch
   if (!chk.ok && chk.kind === 'truncated') {
     onLog(`بخش ${index}: وسط قطع شد — «ادامه بده»`);
     const cont = stripPreamble(await sendAndGet(page, buildContinueMessage(lastSnippet(out))));
-    if (cont && cont.length > 40) { out = (out + '\n\n' + cont).trim(); chk = checkCompleteness(chunkText, out, minRatio); }
+    if (cont && cont.length > 40) { out = (out + '\n\n' + cont).trim(); chk = checkCompleteness(basis, out, minRatio); }
   }
 
   // (b) retry with a FORCEFUL instruction — the manual trick: tell it verbatim, no summary
   if (!chk.ok && depth === 0 && chk.kind !== 'refused') {
     onLog(`بخش ${index}: ناقص (${chk.reason}) — دوباره با تأکید`);
     const out2 = stripPreamble(await sendAndGet(page, buildChunkMessage(basePrompt, chunkText, { index, total, hasNlmSummary, insist: true }), { fresh: true }));
-    const chk2 = checkCompleteness(chunkText, out2, minRatio);
+    const chk2 = checkCompleteness(basis, out2, minRatio);
     if (chk2.ok) return { text: out2, warning: null };
     if ((chk2.ratio || 0) > (chk.ratio || 0)) { out = out2; chk = chk2; }
   }
@@ -102,7 +117,7 @@ async function cleanChunkVerified(page, basePrompt, chunkText, opts = {}) {
   // must fail fast to a review-flag rather than grind for 10 minutes.
   const halves = splitInHalf(chunkText);
   if (halves && depth < 2) {
-    onLog(chk.kind === 'refused' ? `بخش ${index}: Gemini رد کرد — ریزتر می‌کنم تا بخشِ حساس جدا شود` : `بخش ${index}: ریزتر می‌کنم و دوباره`);
+    onLog(chk.kind === 'refused' ? `بخش ${index}: Gemini رد کرد — ریزتر می‌کنم تا بخشِ حساس جدا شود` : `بخش ${index}: هنوز ناقص (${chk.reason}) — ریزتر می‌کنم و دوباره`);
     const a = await cleanChunkVerified(page, basePrompt, halves[0], { ...opts, hasNlmSummary, depth: depth + 1, insist: true });
     const b = await cleanChunkVerified(page, basePrompt, halves[1], { ...opts, hasNlmSummary: false, depth: depth + 1, insist: true });
     return { text: (a.text + '\n\n' + b.text).trim(), warning: a.warning || b.warning };
@@ -111,7 +126,7 @@ async function cleanChunkVerified(page, basePrompt, chunkText, opts = {}) {
   // (d) irreducible. If Gemini refused or gave back only a sliver, keep the RAW transcript for
   //     this piece rather than printing a refusal line in its place — nothing may be lost.
   if (chk.kind === 'refused' || chk.kind === 'empty' || (chk.ratio || 0) < 0.2) {
-    return { text: chunkText, warning: { index, reason: `${chk.reason} — متنِ خامِ رونویسی گذاشته شد` } };
+    return { text: basis, warning: { index, reason: `${chk.reason} — متنِ خامِ رونویسی گذاشته شد` } };
   }
   return { text: out, warning: { index, reason: chk.reason } };
 }
@@ -141,4 +156,4 @@ async function cleanAllChunks(page, basePrompt, chunks, opts = {}) {
   return { text, warnings };
 }
 
-module.exports = { checkCompleteness, cleanChunkVerified, cleanAllChunks, splitInHalf };
+module.exports = { checkCompleteness, cleanChunkVerified, cleanAllChunks, splitInHalf, withoutNlmSummary };

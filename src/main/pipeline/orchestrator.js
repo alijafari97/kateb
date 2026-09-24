@@ -10,7 +10,7 @@ const { ensureChromium } = require('./provision');
 const nlm = require('./notebooklm');
 const geminiMod = require('./gemini');
 const { ensureGemini } = geminiMod;
-const { cleanAllChunks } = require('./verify');
+const { cleanAllChunks, withoutNlmSummary } = require('./verify');
 const audio = require('./audio');
 const { chunkTranscript } = require('./chunk');
 const { buildOutputs } = require('./output');
@@ -189,7 +189,9 @@ class Orchestrator {
         pieces.push(t);
       }
     }
-    const transcript = pieces.join('\n\n');
+    // Every part's NLM transcript opens with NLM's own summary paragraph. The prompt drops the
+    // first one; a long audio's later parts would otherwise put theirs mid-document as speech.
+    const transcript = pieces.map((t, i) => (i === 0 ? t : withoutNlmSummary(t, true))).join('\n\n');
     this.stage(fileId, 'transcribe', 'done', 'تمام');
 
     // 3) clean — Gemini + anti-summarization gate. Serialized via withGemini (the clipboard

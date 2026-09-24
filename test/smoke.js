@@ -2,7 +2,7 @@
 const assert = require('assert');
 const os = require('os'), path = require('path'), fs = require('fs');
 const { chunkTranscript } = require('../src/main/pipeline/chunk');
-const { checkCompleteness } = require('../src/main/pipeline/verify');
+const { checkCompleteness, withoutNlmSummary } = require('../src/main/pipeline/verify');
 const { buildOutputs } = require('../src/main/pipeline/output');
 
 // 1) chunking
@@ -29,6 +29,23 @@ assert(cf.ok === true, 'faithful output must PASS');
 assert(cs.ok === false && cs.kind === 'summary', 'summarized output must be caught as summary');
 assert(ct.ok === false && ct.kind === 'truncated', 'truncated output must be caught as truncated');
 console.log('verify:     3/3 cases  OK');
+
+// 2b) the first chunk opens with NotebookLM's auto-summary, which the prompt tells Gemini to DROP —
+//     so completeness is measured without it (else chunk 1 always looks "too short")
+const nlmSum = 'این متن گفتگویی دربارهٔ محصول است که به فیچرهای مختلف می‌پردازد.';
+const speech = 'آره می‌خوایم شروع کنیم. این فیچر برای اینه که کاربر راحت‌تر پیدا کنه.\n\nبعد می‌رسیم به بخشِ دوم.';
+assert.strictEqual(withoutNlmSummary(nlmSum + '\n\n' + speech, true), speech, 'drops the leading NLM summary');
+assert.strictEqual(withoutNlmSummary(nlmSum + '\n\n' + speech, false), nlmSum + '\n\n' + speech, 'keeps text when there is no summary');
+assert.strictEqual(withoutNlmSummary('کوتاه\n\n' + 'x'.repeat(3), true), 'کوتاه\n\nxxx', 'never drops half the chunk');
+const speechFirst = 'سلام علیکم، امروز دربارهٔ فیچرِ جدید صحبت می‌کنیم.\n\n' + speech + '\n\n' + speech;
+assert.strictEqual(withoutNlmSummary(speechFirst, true), speechFirst, 'a first paragraph that is SPEECH is never dropped');
+// realistic proportions: a short summary paragraph, then several paragraphs of speech
+const talk = Array.from({ length: 6 }, (_, i) => `جملهٔ ${i + 1} از گفت‌وگو دربارهٔ این فیچر است که کاربر راحت‌تر پیدا کند.`);
+const chunk1 = nlmSum + ' ' + nlmSum + '\n\n' + talk.join('\n\n');
+const faithfulClean = talk.join(' ');
+assert(!checkCompleteness(chunk1, faithfulClean, 0.85).ok, 'counting the summary fails a faithful chunk…');
+assert(checkCompleteness(withoutNlmSummary(chunk1, true), faithfulClean, 0.85).ok, '…measured without it, it passes');
+console.log('verify:     NLM summary excluded from the length check  OK');
 
 // 3) real docx + md generation
 (async () => {
