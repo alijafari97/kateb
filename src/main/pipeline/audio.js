@@ -5,9 +5,25 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-let ffmpegPath = require('ffmpeg-static');
-// electron-builder unpacks native bins to app.asar.unpacked
-if (ffmpegPath && ffmpegPath.includes('app.asar')) ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+// Resolve ffmpeg. Prefer the bundled ffmpeg-static binary (unpacked from asar when packaged).
+// But that binary is fetched by a postinstall DOWNLOAD that can fail silently (e.g. on a
+// filtered network) — leaving a path to nothing, so every probe/shrink/split quietly no-ops
+// and big files get uploaded raw. In that case fall back to an ffmpeg on the system.
+function resolveFfmpeg() {
+  let p = null;
+  try { p = require('ffmpeg-static'); } catch (_) {}
+  if (p) {
+    p = p.replace(/app\.asar(?!\.unpacked)/, 'app.asar.unpacked');   // electron-builder unpacks native bins
+    if (fs.existsSync(p)) return p;
+  }
+  const exe = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const dirs = String(process.env.PATH || '').split(path.delimiter)
+    .concat([path.join(home, '.local', 'bin'), '/usr/local/bin', '/usr/bin', '/opt/homebrew/bin']);
+  for (const d of dirs) { try { if (d && fs.existsSync(path.join(d, exe))) return path.join(d, exe); } catch (_) {} }
+  return p || exe;
+}
+let ffmpegPath = resolveFfmpeg();
 
 function run(args) {
   return new Promise((resolve) => {

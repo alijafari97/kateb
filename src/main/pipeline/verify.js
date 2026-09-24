@@ -7,6 +7,11 @@ const { sendAndGet } = require('./gemini');
 // Tell-tale phrases that mean Gemini summarized or bailed instead of cleaning verbatim.
 const SUMMARY_RE = /به\s?طور\s?خلاصه|خلاصه‌?ای از|به اختصار|(?:^|\s)و ادامه(?:\s|…|\.)|ادامه دارد|ادامه می‌?یابد|\[\s*متن ادامه دارد\s*\]|\[\s*\.\.\.\s*\]|و الی آخر|and so on|to summari[sz]e|in summary/i;
 
+// Gemini's safety refusal ("I'm a language model and this is beyond what I'm designed for").
+// A content refusal isn't fixed by «ادامه بده» or by insisting — only by isolating the part
+// that trips it (split) and, if that part still won't pass, keeping its RAW text.
+const REFUSAL_RE = /من (یک )?مدل (زبان|زبانی)|فراتر از (چیزی|آن چیزی) (است )?که (برایش|برای آن) طراحی|نمی‌?توانم (در این مورد |با این )?کمک|language model|not able to help|can.?t help with|beyond what I.?m designed|I can.?t assist/i;
+
 const norm = (s) => String(s || '').replace(/[#*>`_]|(?:^|\s)-\s/g, ' ').replace(/‌/g, '').replace(/\s+/g, ' ').trim();
 const wordsOf = (s) => norm(s).split(' ').filter((w) => w.length > 2);
 
@@ -15,17 +20,23 @@ function checkCompleteness(input, output, minRatio) {
   const inN = norm(input);
   const outN = norm(output);
   if (!outN || outN.length < 40) return { ok: false, kind: 'empty', reason: 'خروجی خالی', ratio: 0 };
+  if (outN.length < 600 && REFUSAL_RE.test(output)) return { ok: false, kind: 'refused', reason: 'Gemini از تمیزکردنِ این بخش خودداری کرد', ratio: outN.length / Math.max(1, inN.length) };
   const ratio = outN.length / Math.max(1, inN.length);
 
   // ZWNJ-tolerant: «به‌طور خلاصه» often uses a half-space, not a real space.
   const flat = String(output).replace(/‌/g, ' ');
   if (SUMMARY_RE.test(output) || SUMMARY_RE.test(flat)) return { ok: false, kind: 'summary', reason: 'عبارتِ خلاصه‌ساز', ratio };
 
+  // A low threshold means the prompt RESTRUCTURES the text (e.g. a product doc organised by
+  // feature, speakers merged, filler dropped) — the output order no longer follows the input,
+  // so "is the input's ending at the output's end?" stops meaning anything. Tail checks only
+  // apply to verbatim-order cleaning (ceremonies, ~0.85).
+  const verbatim = minRatio >= 0.7;
   if (ratio < minRatio) {
     const tail = wordsOf(input).slice(-10);
     const outSet = new Set(wordsOf(output));
     const present = tail.filter((w) => outSet.has(w)).length;
-    return { ok: false, kind: present < 3 ? 'truncated' : 'summary', reason: `طولِ کم (${ratio.toFixed(2)})`, ratio };
+    return { ok: false, kind: (verbatim && present < 3) ? 'truncated' : 'summary', reason: `طولِ کم (${ratio.toFixed(2)})`, ratio };
   }
 
   // length is fine, but guard against a clean cut where the tail is simply gone
@@ -33,7 +44,7 @@ function checkCompleteness(input, output, minRatio) {
   const outW = wordsOf(output);
   const outTail = new Set(outW.slice(-Math.max(20, Math.ceil(outW.length * 0.4))));
   const present = tail.filter((w) => outTail.has(w)).length;
-  if (tail.length >= 6 && present === 0) return { ok: false, kind: 'truncated', reason: 'انتهای متن جا افتاده', ratio };
+  if (verbatim && tail.length >= 6 && present === 0) return { ok: false, kind: 'truncated', reason: 'انتهای متن جا افتاده', ratio };
 
   return { ok: true, ratio };
 }
@@ -65,7 +76,7 @@ async function cleanChunkVerified(page, basePrompt, chunkText, opts = {}) {
   const { index = 1, total = 1, hasNlmSummary = false, minRatio = 0.85, onLog = () => {}, depth = 0, insist = false } = opts;
   const msg = buildChunkMessage(basePrompt, chunkText, { index, total, hasNlmSummary, insist });
 
-  let out = stripPreamble(await sendAndGet(page, msg));
+  let out = stripPreamble(await sendAndGet(page, msg, { fresh: true }));
   let chk = checkCompleteness(chunkText, out, minRatio);
 
   // (a) truncated mid-output -> ask Gemini to continue, then stitch
@@ -76,9 +87,9 @@ async function cleanChunkVerified(page, basePrompt, chunkText, opts = {}) {
   }
 
   // (b) retry with a FORCEFUL instruction — the manual trick: tell it verbatim, no summary
-  if (!chk.ok && depth === 0) {
+  if (!chk.ok && depth === 0 && chk.kind !== 'refused') {
     onLog(`بخش ${index}: ناقص (${chk.reason}) — دوباره با تأکید`);
-    const out2 = stripPreamble(await sendAndGet(page, buildChunkMessage(basePrompt, chunkText, { index, total, hasNlmSummary, insist: true })));
+    const out2 = stripPreamble(await sendAndGet(page, buildChunkMessage(basePrompt, chunkText, { index, total, hasNlmSummary, insist: true }), { fresh: true }));
     const chk2 = checkCompleteness(chunkText, out2, minRatio);
     if (chk2.ok) return { text: out2, warning: null };
     if ((chk2.ratio || 0) > (chk.ratio || 0)) { out = out2; chk = chk2; }
@@ -91,13 +102,17 @@ async function cleanChunkVerified(page, basePrompt, chunkText, opts = {}) {
   // must fail fast to a review-flag rather than grind for 10 minutes.
   const halves = splitInHalf(chunkText);
   if (halves && depth < 2) {
-    onLog(`بخش ${index}: ریزتر می‌کنم و دوباره`);
+    onLog(chk.kind === 'refused' ? `بخش ${index}: Gemini رد کرد — ریزتر می‌کنم تا بخشِ حساس جدا شود` : `بخش ${index}: ریزتر می‌کنم و دوباره`);
     const a = await cleanChunkVerified(page, basePrompt, halves[0], { ...opts, hasNlmSummary, depth: depth + 1, insist: true });
     const b = await cleanChunkVerified(page, basePrompt, halves[1], { ...opts, hasNlmSummary: false, depth: depth + 1, insist: true });
     return { text: (a.text + '\n\n' + b.text).trim(), warning: a.warning || b.warning };
   }
 
-  // (d) irreducible -> hand back what we have, flagged for the final gate
+  // (d) irreducible. If Gemini refused or gave back only a sliver, keep the RAW transcript for
+  //     this piece rather than printing a refusal line in its place — nothing may be lost.
+  if (chk.kind === 'refused' || chk.kind === 'empty' || (chk.ratio || 0) < 0.2) {
+    return { text: chunkText, warning: { index, reason: `${chk.reason} — متنِ خامِ رونویسی گذاشته شد` } };
+  }
   return { text: out, warning: { index, reason: chk.reason } };
 }
 

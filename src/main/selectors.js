@@ -4,8 +4,8 @@
 
 module.exports = {
   notebooklm: {
-    home: 'https://notebooklm.google.com/',
-    notebookUrl: (id) => `https://notebooklm.google.com/notebook/${id}`,
+    home: 'https://notebook.google.com/',   // rebranded «Gemini Notebook» (Sep 2026); old host redirects here
+    notebookUrl: (id) => `https://notebook.google.com/notebook/${id}`,
     // NLM's Sources panel COLLAPSES below ~1200px and the .mp3 source button vanishes.
     minViewport: { width: 1500, height: 1000 },
     // The create-notebook button — Google renamed it "Create new notebook" -> "New notebook"
@@ -28,7 +28,10 @@ module.exports = {
     processedSel: '.follow-up-chip, [class*="follow-up"]',
     // Notebook-title input (for renaming, optional).
     titleInputSel: 'input.title-input',
-    minTranscriptChars: 3000
+    // Opening a source needs a TRUSTED click on its title (Gemini Notebook ignores synthetic clicks).
+    sourceTitleSel: '.source-title',
+    // Panel text (guide + transcript) must reach this AND hold steady. Low enough for short voice notes.
+    minTranscriptChars: 400
   },
 
   gemini: {
@@ -37,6 +40,9 @@ module.exports = {
     sendSel: 'button[aria-label="Send message"]',
     // Each model reply is a <message-content> element.
     responseSel: 'message-content',
+    // Model picker ("Open mode picker, currently Flash"). Flash refuses long dense Persian
+    // technical transcripts ("I'm a language model… beyond what I'm designed for"); Pro cleans them.
+    modePickerSel: 'button[aria-label^="Open mode picker"]',
     // A visible "stop"/generating control means the reply is still streaming.
     stopRe: /stop/i,
     // Gemini's chat input silently caps around here; keep chunks well under it.

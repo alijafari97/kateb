@@ -43,6 +43,18 @@ const { DEFAULT_PROMPT } = require('../src/main/pipeline/prompt');
     assert(!res.warning, 'recovered without an unrecoverable warning');
     console.log('Gemini + verify: summary detected -> resplit -> recovered   OK');
 
+    // ---- Test 3: Gemini model picker — fresh chats run on Pro; "Flash" is 3.x Flash, not
+    //      Flash-Lite; the menu row wins over an "Upgrade to … Pro" banner ----
+    const { ensureModel } = require('../src/main/pipeline/gemini');
+    const label = () => gpage.locator(sel.gemini.modePickerSel).first().getAttribute('aria-label');
+    assert(/currently Pro$/.test(await label()), 'fresh chats run on Pro: ' + await label());
+    await ensureModel(gpage, 'Flash');
+    assert(/currently Flash$/.test(await label()), 'Flash -> 3.x Flash (not Flash-Lite): ' + await label());
+    await ensureModel(gpage, 'Pro');
+    assert(/currently Pro$/.test(await label()), 'back to Pro: ' + await label());
+    assert(!(await gpage.evaluate(() => window.__upgradeClicked)), 'never clicks the upgrade banner');
+    console.log('Gemini model picker: Pro default, Flash != Flash-Lite, no upgrade banner   OK');
+
     console.log('\nALL INTEGRATION TESTS PASSED ✓');
   } finally {
     await browser.close();

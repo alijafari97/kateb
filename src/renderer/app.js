@@ -205,6 +205,8 @@ async function loadSettings() {
   $('#setConcurrency').value = s.concurrency || 2;
   $('#setMaxMB').value = s.maxAudioMB || 45;
   $('#setGeminiParallel').checked = !!s.geminiParallel;
+  $('#setGeminiModel').value = s.geminiModel || 'Pro';
+  $('#setMinRatio').value = s.minLengthRatio || 0.85;
 }
 $('#pickDir').addEventListener('click', async () => { const d = await K.pickFolder(); if (d) $('#setDir').value = d; });
 $('#saveSet').addEventListener('click', async () => {
@@ -217,7 +219,9 @@ $('#saveSet').addEventListener('click', async () => {
     showBrowser: $('#setShowBrowser').checked,
     concurrency: +$('#setConcurrency').value || 2,
     maxAudioMB: +$('#setMaxMB').value || 45,
-    geminiParallel: $('#setGeminiParallel').checked
+    geminiParallel: $('#setGeminiParallel').checked,
+    geminiModel: $('#setGeminiModel').value || 'Pro',
+    minLengthRatio: Math.min(1, Math.max(0.2, +$('#setMinRatio').value || 0.85))
   });
   // if the display mode changed here, drop the idle browser so the next run honors it
   if ($('#setShowBrowser').checked !== curShowBrowser) { curShowBrowser = $('#setShowBrowser').checked; try { await K.resetBrowser(); } catch (_) {} }
@@ -229,4 +233,5 @@ $('#resetSet').addEventListener('click', async () => {
   $('#setDir').value = d.output.dir; $('#setSplit').value = d.splitAboveMinutes; $('#setChunk').value = d.chunkWords;
   $('#setShowBrowser').checked = d.showBrowser; $('#setConcurrency').value = d.concurrency; $('#setMaxMB').value = d.maxAudioMB;
   $('#setGeminiParallel').checked = d.geminiParallel;
+  $('#setGeminiModel').value = d.geminiModel; $('#setMinRatio').value = d.minLengthRatio;
 });

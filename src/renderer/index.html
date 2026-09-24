@@ -83,6 +83,21 @@
 
         <div class="row2">
           <div>
+            <label class="field-lab">مدلِ Gemini برای تمیزکاری</label>
+            <select id="setGeminiModel" class="input">
+              <option value="Pro">Pro — مطمئن‌تر برای متن‌های فنی و طولانی (پیشنهادی)</option>
+              <option value="Flash">Flash — سریع‌تر، ولی گاهی متن را رد می‌کند</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-lab">حداقل نسبتِ طولِ خروجی به رونویسی</label>
+            <input id="setMinRatio" class="input mono" type="number" min="0.2" max="1" step="0.05" />
+            <div class="hint">۰٫۸۵ برای متنِ کلمه‌به‌کلمه (مجالس) · ۰٫۴۵ وقتی پرامپت متن را بازچینی/خلاصه‌نویسیِ گفت‌وگو می‌کند (مثلِ سندِ محصول)</div>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div>
             <label class="field-lab">پردازشِ همزمانِ چند فایل</label>
             <input id="setConcurrency" class="input mono" type="number" min="1" max="4" />
           </div>

@@ -8,7 +8,8 @@ const crypto = require('crypto');
 const { KatebBrowser } = require('./browser');
 const { ensureChromium } = require('./provision');
 const nlm = require('./notebooklm');
-const { ensureGemini } = require('./gemini');
+const geminiMod = require('./gemini');
+const { ensureGemini } = geminiMod;
 const { cleanAllChunks } = require('./verify');
 const audio = require('./audio');
 const { chunkTranscript } = require('./chunk');
@@ -194,6 +195,7 @@ class Orchestrator {
     // 3) clean — Gemini + anti-summarization gate. Serialized via withGemini (the clipboard
     //    paste can't overlap), so files transcribe in parallel but clean one at a time; a
     //    waiting file shows «در نوبتِ Gemini». RESUMABLE: a completed clean is reused.
+    geminiMod.model = this.config.geminiModel || 'Pro';   // model for every fresh Gemini chat
     const cCache = path.join(jobWork, 'cleaned.json');
     const promptHash = crypto.createHash('md5').update(String(this.config.cleaningPrompt || '')).digest('hex').slice(0, 12);
     let text, warnings, cached = null;

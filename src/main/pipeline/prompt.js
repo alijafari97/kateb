@@ -20,11 +20,14 @@ function buildChunkMessage(basePrompt, chunkText, opts = {}) {
   const { index = 1, total = 1, hasNlmSummary = false, insist = false } = opts;
   const lines = [basePrompt.trim(), ''];
   if (insist) {
-    lines.push('⚠️ تأکیدِ جدی: دفعهٔ قبل این متن را ناقص یا خلاصه برگرداندی. این‌بار **کلمه‌به‌کلمه و کاملِ کامل** بنویس — حتی یک جمله هم حذف یا خلاصه نکن. طولِ خروجی باید تقریباً برابرِ طولِ ورودی باشد. هیچ عبارتی مثلِ «به‌طور خلاصه»، «و ادامه دارد» یا سه‌نقطه نگذار؛ کلِ متن را کامل بنویس.', '');
+    // no "last time…" — every chunk now goes to a FRESH chat, so there is no last time to refer to
+    lines.push('⚠️ تأکیدِ جدی: این متن را **کاملِ کامل** بنویس — هیچ نکته، جمله یا جزئیاتی را حذف یا خلاصه نکن. هیچ عبارتی مثلِ «به‌طور خلاصه»، «و ادامه دارد» یا سه‌نقطه نگذار؛ تا آخرِ متن بنویس.', '');
   }
-  lines.push(`(این «بخش ${index} از ${total}» از رونویسی است.)`);
-  if (index > 1) {
-    lines.push('این ادامهٔ مستقیمِ بخشِ قبل است؛ فقط جایی که بخش/موضوعِ جدید واقعاً شروع می‌شود هدینگ بگذار و چیزی به اول/آخر اضافه نکن.');
+  // Each chunk is sent in its OWN fresh chat, so frame it as a self-contained fragment.
+  // (Saying "this continues the previous part" made Gemini ask for that part and reply
+  // almost empty — the previous part isn't in a fresh chat.)
+  if (total > 1) {
+    lines.push(`(این «بخش ${index} از ${total}» از یک رونویسیِ طولانی است. ممکن است وسطِ جمله یا وسطِ یک موضوع شروع یا تمام شود — همین بخش را به‌تنهایی و کامل تمیز کن؛ منتظرِ بخش‌های دیگر نباش، دربارهٔ آن‌ها چیزی نپرس، و مقدمه یا جمع‌بندی اضافه نکن. فقط جایی که موضوعِ جدید واقعاً شروع می‌شود هدینگ بگذار.)`);
   }
   if (hasNlmSummary) {
     lines.push('این بخش با یک خلاصهٔ خودکارِ NotebookLM شروع می‌شود؛ آن پاراگراف را کاملاً نادیده بگیر و ننویس.');

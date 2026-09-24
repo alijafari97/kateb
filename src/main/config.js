@@ -33,7 +33,10 @@ function defaults() {
     concurrency: 2,
     // Clean files in Gemini in PARALLEL too (one Gemini tab per file). Off by default:
     // serial is safer against Gemini's per-account daily limit. On = faster for many files.
-    geminiParallel: false
+    geminiParallel: false,
+    // Gemini model used for cleaning (matched against the mode-picker option text, e.g. "3.1 Pro").
+    // Pro: reliable on long technical transcripts. Flash: faster but refuses some of them.
+    geminiModel: 'Pro'
   };
 }
 

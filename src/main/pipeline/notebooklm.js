@@ -15,7 +15,7 @@ const CREATE_FN = `(reSrc)=>{const rx=new RegExp(reSrc,'i');const b=[...document
 // the app got stuck "uploading" forever even though NLM had the source ready.
 const SRC_FIND_FN = `(base, reSrc)=>{
   const rx=new RegExp(reSrc,'i'); const bl=(base||'').toLowerCase();
-  return [...document.querySelectorAll('button,[role=button]')].find(e=>{
+  return [...document.querySelectorAll('button,[role=button],.source-title')].find(e=>{
     const t=((e.getAttribute('aria-label')||'')+' '+(e.textContent||'')).toLowerCase();
     return (bl.length>=3 && t.includes(bl)) || rx.test(t);
   });
@@ -39,6 +39,22 @@ async function clickSource(page, fname) {
     ['pointerdown', 'mousedown', 'mouseup', 'click'].forEach((t) => el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window })));
     return 'OK';
   }, { f: SRC_FIND_FN, base: baseOf(fname), re: S.sourceRe.source }).catch(() => 'NO');
+}
+
+// Open the source's viewer with a TRUSTED click. Gemini Notebook (the Sep-2026 rebrand of
+// NotebookLM) ignores the synthetic dispatchEvent click the old code used, so the transcript
+// panel never opened and the app waited forever — even though the source was fully processed.
+async function openSource(page, fname) {
+  const base = String(fname || '').split(/[\\/]/).pop();
+  const cands = [
+    page.locator(S.sourceTitleSel).first(),                                                    // Gemini Notebook
+    page.locator('.single-source-container button, .single-source-container [role=button]').first(), // older UI
+    base ? page.getByText(base, { exact: true }).first() : null
+  ].filter(Boolean);
+  for (const loc of cands) {
+    try { if (await loc.count()) { await loc.click({ timeout: 6000 }); return 'OK'; } } catch (_) {}
+  }
+  return clickSource(page, fname);   // last resort: the old synthetic click
 }
 
 async function transcriptLength(page) {
@@ -123,14 +139,18 @@ async function transcribeFile(browser, filePath, { maxWaitMs = 30 * 60 * 1000, o
       }
 
       // open the source and poll its transcript (all in place — no navigation)
-      let clicked = 'NO';
-      for (let i = 0; i < 3 && clicked !== 'OK'; i++) {
-        clicked = await clickSource(p, filePath);
-        if (clicked !== 'OK') await p.waitForTimeout(2500);
+      if ((await transcriptLength(p)) < S.minTranscriptChars) {
+        for (let i = 0; i < 3; i++) { if ((await openSource(p, filePath)) === 'OK') break; await p.waitForTimeout(2500); }
       }
-      let len = 0;
-      for (let i = 0; i < 5; i++) { await p.waitForTimeout(3000); len = await transcriptLength(p); if (len > S.minTranscriptChars) break; }
-      if (len > S.minTranscriptChars) {
+      // NLM fills the panel in one go once processing is done — take it only when present AND stable
+      let len = 0, prev = -1;
+      for (let i = 0; i < 6; i++) {
+        await p.waitForTimeout(3000);
+        len = await transcriptLength(p);
+        if (len >= S.minTranscriptChars && len === prev) break;
+        prev = len;
+      }
+      if (len >= S.minTranscriptChars) {
         const raw = await p.evaluate((sel) => { const e = document.querySelector(sel); return e ? e.textContent : ''; }, S.transcriptSel);
         onLog('رونویسی آماده شد ✓');
         return stripSourceGuide(raw);
@@ -149,4 +169,4 @@ function stripSourceGuide(text) {
   return (m ? text.slice(m.index + m[0].length) : text).trim();
 }
 
-module.exports = { transcribeFile, stripSourceGuide, hasAudioSource, transcriptLength };
+module.exports = { transcribeFile, stripSourceGuide, hasAudioSource, transcriptLength, openSource };

@@ -33,10 +33,22 @@ const nlmNotebook = (id) => page('NotebookLM', `
 // Gemini mock: <=300 words -> echo as clean paragraphs (passes the gate);
 // >300 words -> a short summary containing «به‌طور خلاصه» (must be caught & recovered).
 const geminiPage = page('Gemini', `
+  <button aria-label="Upgrade to Google AI Pro" onclick="window.__upgradeClicked=true">Upgrade to Google AI Pro</button>
+  <button id="mp" aria-label="Open mode picker, currently Flash" onclick="document.getElementById('menu').hidden=!document.getElementById('menu').hidden">Flash</button>
+  <div id="menu" role="menu" hidden>
+    <div role="menuitem" onclick="pickModel('Flash-Lite')">3.5 Flash-Lite Fastest answers</div>
+    <div role="menuitem" onclick="pickModel('Flash')">3.8 Flash All-around help</div>
+    <div role="menuitem" onclick="pickModel('Pro')">3.1 Pro Advanced reasoning</div>
+    <div role="menuitem" onclick="pickModel('Extended thinking')">Extended thinking Complex problem solving</div>
+  </div>
   <div class="input-area"><div class="ql-editor" contenteditable="true"></div></div>
   <button aria-label="Send message" onclick="reply()">send</button>
   <div id="log"></div>
   <script>
+    // model picker like the real one: the choice sticks across fresh chats (same tab)
+    function setModel(m){ const b=document.getElementById('mp'); b.setAttribute('aria-label','Open mode picker, currently '+m); b.textContent=m; }
+    function pickModel(m){ try{ sessionStorage.setItem('model',m); }catch(_){} setModel(m); document.getElementById('menu').hidden=true; }
+    setModel((function(){ try{ return sessionStorage.getItem('model'); }catch(_){ return null; } })() || 'Flash');
     function reply(){
       const ed=document.querySelector('.ql-editor');
       const full=(ed.innerText||'');
